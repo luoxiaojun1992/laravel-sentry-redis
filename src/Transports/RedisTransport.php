@@ -45,7 +45,12 @@ class RedisTransport
             return;
         }
 
-        $payload = json_encode($data);
+        $payload = json_encode([
+            'data' => $data,
+            'server' => $this->raveClient->server,
+            'public_key' => $this->raveClient->public_key,
+            'secret_key' => $this->raveClient->secret_key,
+        ]);
 
         try {
             $this->enqueue($payload);

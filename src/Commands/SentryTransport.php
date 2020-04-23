@@ -83,9 +83,9 @@ class SentryTransport extends Command
             $rawData = $redisClient->rpop($this->redisOptions['queue_name']);
             if (!empty($rawData)) {
                 $data = json_decode($rawData, true);
-                if ((!json_last_error()) && (!empty($data))) {
+                if ((!json_last_error()) && (!empty($data)) && (!empty($data['data']))) {
                     try {
-                        $this->report($data);
+                        $this->report($data['data'], $data['server'], $data['public_key'], $data['secret_key']);
                     } catch (\Throwable $e) {
                         Log::error(
                             'Redis to Sentry Transport error, exception: ' . $e->getMessage() . '|' .
@@ -104,10 +104,28 @@ class SentryTransport extends Command
         return;
     }
 
-    protected function report($data)
+    protected function report($data, $server, $publicKey, $secretKey)
     {
         $sentryClient = $this->getSentryClient();
-        $sentryClient->send($data);
+
+        $sentryClient->close_curl_resource();
+
+        $oldServer = $sentryClient->server;
+        $sentryClient->server = $server;
+
+        $oldPublicKey = $sentryClient->public_key;
+        $sentryClient->public_key = $publicKey;
+
+        $oldSecretKey = $sentryClient->secret_key;
+        $sentryClient->secret_key = $secretKey;
+
+        try {
+            $sentryClient->send($data);
+        } catch (\Throwable $e) {
+            $sentryClient->server = $oldServer;
+            $sentryClient->public_key = $oldPublicKey;
+            $sentryClient->secret_key = $oldSecretKey;
+        }
     }
 
     protected function getSentryClient()
